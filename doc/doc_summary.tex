@@ -1,0 +1,1569 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[polish]{babel}
+\usepackage[OT4]{polski}
+\usepackage{amsmath}
+\usepackage{url}
+
+\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue]{hyperref}
+
+\usepackage[pdftex]{graphicx}
+
+%\linespread{1.2}
+
+
+\title{Projekt z Metod Odkrywania Wiedzy\\Prezentacja uzyskanych wyników\\\Large{Proste algorytmy klasyfikacji tekstu. Porównania ze standardowymi algorytmami klasyfikacji dostępnymi~w~R.}\\}
+
+\author{Marcin Chwedczuk, Piotr Monarski}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Wstęp}
+W ramach projektu z przedmiotu Metody Odkrywania Wiedzy 
+postanowiliśmy zająć się klasyfikacją tekstów. 
+Zadanie jakie przed sobą postawiliśmy polega na rozpoznaniu
+dziedziny nauki z jaką jest związany dany artykuł naukowy
+na podstawie jego abstraktu.
+
+W trakcie projektu zostały zaimplementowane
+algorytmy: kNN oraz naiwny klasyfikator bayesowski w wersji
+podstawowej, multinomial oraz bernoulli.
+Algorytmy te zostały porównane z ich odpowiednikami 
+zaimplementowanymi w środowisku R, dodatkowo dokonaliśmy 
+porównania z algorytmem budującym drzewa decyzyjne.
+ 
+W ramach części analitycznej projektu staraliśmy się odpowiedzieć na
+pytania:
+\begin{enumerate}
+	\item
+		Który z testowanych algorytmów 
+		najlepiej radzi sobie z postawionym
+		problemem klasyfikacji
+	\item
+		Jakie czynniki mają decydujący wpływ na jakość
+		uzyskiwanych hipotez
+\end{enumerate}
+
+\section{Wstępne przetwarzanie surowych danych}
+	\subsection{Opis danych}
+		Jako dane uczące oraz testowe postanowiliśmy wykorzystać
+		zbiór \textit{NSF Research Award Abstracts 1990-2003 Data Set}
+		\cite{abstracts}
+		wchodzący w skład repozytorium UCI.
+		Zbiór ten zawiera 129 tysięcy streszczeń artykułów naukowych 
+		w języku angielskim,
+		które zostały nagrodzone przez National Science Foundation.
+		Każdemu streszczeniu towarzyszy szereg informacji zawierających
+		między innymi nazwiska autorów artykułu, tytuł artykułu oraz
+		dziedzinę zastosowań (przy czym artykuł może mieć więcej 
+		niż jedną dziedzinę zastosowań).
+		Łączny rozmiar nieskompresowanego zbioru danych to ponad 400 MB.
+		
+		W naszej pracy wykorzystujemy jedynie część tego ogromnego zbioru 
+		danych dystrybuowaną w postaci pliku \texttt{Part1.zip} i zawierającą
+		zwycięskie artykuły naukowe z lat 1990 - 1994 (łącznie 51 760 streszczeń).
+		\begin{figure}[htb]
+			\centering
+			\includegraphics[scale=0.45]{./img/part1_dir_struct}
+			\caption{Struktura katalogów zawartych w archiwum \texttt{Part1.zip}}
+		\end{figure}
+		
+		Za opis pojedynczego artykułu naukowego odpowiada pojedynczy plik
+		\texttt{.txt} o strukturze przedstawionej na rysunku
+		\ref{fig:textstruct}. W ramach naszego projektu wykorzystujemy  
+		jedynie pola \texttt{Fld Applictn} oraz \texttt{Abstract}, 
+		zawierające odpowiednio dziedziny do których należy artykuł oraz
+		jego streszczenie.
+		\begin{figure}[!h]
+			\scriptsize
+			\begin{verbatim}
+Title       : Large Scale Structure and Dynamics of Non-Equilibrium Systems
+Type        : Award
+NSF Org     : DMR 
+Latest
+Amendment
+Date        : November 4,  1992   
+File        : a9013984
+
+Award Number: 9013984
+Award Instr.: Continuing grant                             
+Prgm Manager: G. Bruce Taggart                        
+	      DMR  DIVISION OF MATERIALS RESEARCH          
+	      MPS  DIRECT FOR MATHEMATICAL & PHYSICAL SCIEN
+Start Date  : November 1,  1990   
+Expires     : October 31,  1993    (Estimated)
+Expected
+Total Amt.  : $195000             (Estimated)
+Investigator: Michael Cross mcc@caltech.edu  (Principal Investigator current)
+Sponsor     : California Inst of Tech
+	      1201 E California Blvd
+	      Pasadena, CA  911250001    818/795-4571
+
+NSF Program : 1765      MATERIALS THEORY
+Fld Applictn: 0106000   Materials Research                      
+              13        Physics                                 
+Program Ref : 9161,
+Abstract    :
+                                                                                             
+              The PI proposes a theoretical study of the large scale and slow                
+              dynamics of spatially extended non-equilibrium systems.  Two                   
+              classes of model systems will be investigated: 1. one and two                  
+              dimensional lattices of discrete chaotic elements or oscillators               
+              with dynamics preserving a conserved quantity or having an internal            
+              symmetry; 2. two dimensional fluid flow.  Numerical simulation,                
+              Monte Carlo methods, mean field theory, and renormalization group              
+              methods will be used.
+			\end{verbatim}
+			\caption{Przykładowy plik opisujący artykuł naukowy}
+			\label{fig:textstruct}		
+		\end{figure}
+	
+	\subsection{Etap I: Usuwanie nieznaczących informacji}
+		Pierwszy etap przetwarzania danych ma na celu usunięcie z powyżej
+		opisanych plików \texttt{.txt} informacji nieistotnych z naszego punktu
+		widzenia. Po przetworzeniu każdy plik \texttt{.txt} będzie miał 	
+		następującą strukturę:
+		\begin{verbatim}
+dziedzina_1, dziedzina_2, ..., dziedzina_N
+(pusta linia)
+Treść streszczenia artykułu naukowego w pojedynczej linii
+		\end{verbatim}
+		Dokładniej plik będzie składał się z trzech linii:
+		\begin{itemize}
+			\item
+				Pierwszej zawierającej nazwy dziedzin zastosowań danego artykułu
+				oddzielone znakiem przecinka (wymagana jest obecność co najmniej
+				jednej dziedziny)
+			\item
+				Drugiej która pełni rolę separatora i nie zawiera żadnych 
+				danych
+			\item
+				Trzeciej która zawiera streszczenie artykułu ze znakami 
+				\verb+\n+ i \verb+\r+ zamienionymi na spacje
+				(ta linia musi zawierać co najmniej 30 znaków)
+		\end{itemize}
+				
+		Dodatkowym rezultatem etapu I będzie usunięcie ze zbioru danych 
+		opisów artykułów które nie zawierają dziedzin(-ny) zastosowań lub
+		posiadają zbyt krótkie streszczenia.
+		
+		Wstępne przetwarzanie danych należy wykonać w 
+		następujący sposób:
+		\begin{enumerate}
+			\item
+				Najpierw kopiujemy wszystkie pliki \verb+.txt+ zawarte
+				w archiwum \texttt{Part1.zip} do wybranego katalogu
+				np. \verb+c:\data_in+. Skopiować należy wyłącznie pliki
+				bez struktury katalogów
+			\item
+				Tworzymy katalog w którym znajdą się przetworzone pliki
+				np. \verb+c:\data_out+. Następnie korzystamy z
+				funkcji \texttt{preprocess} zawartej w naszym pakiecie języka R:
+				\begin{verbatim}
+preprocess('c:\data_in', 'c:\data_out');
+				\end{verbatim}
+				Po zakończeniu działania funkcji \texttt{preprocess} katalog
+				\verb+c:\data_out+ powinien zawierać przetworzone pliki
+				\verb+.txt+ o nazwach zgodnych z ich oryginalnymi odpowiednikami
+		\end{enumerate}	
+		
+		\textsc{UWAGA:} Aby zaoszczędzić użytkownikom czasu niezbędnego
+		do wykonania powyższych kroków przygotowaliśmy skrypt 
+		\verb+data_preprocessing_report.R+ który wykonuje opisane wyżej
+		czynności. Aby skorzystać ze skryptu należy zmodyfikować
+		linie:
+		\begin{verbatim}
+# Sciezka do katalogu ktory zawiera rozpakowane
+# archiwum Part1.zip
+org.data.directory <- 'D:/tmp/words/Part1/'
+
+# Sciezka do katalogu ktory bedzie zawieral
+# przetworzone dane oraz dane tymczasowe
+data.directory <- 'd:/mtmp/';
+		\end{verbatim}
+		Po wykonaniu skryptu katalog wskazany jako \verb+data.directory+
+		powinien zawierać podkatalog \verb+data_preprocessed+ zawierający
+		wstępnie przetworzone pliki artykułów (około 47 tysięcy plików).	
+	
+	\subsection{Etap II: Konwersja na ramkę danych}
+		Drugi etap przetwarzania danych polega na zamianie zbioru
+		plików utworzonych na etapie I na ramkę danych.
+		
+		Utworzona ramka danych będzie miała format przedstawiony w
+		tabeli \ref{t:df}.
+		\begin{table}[!h]	
+			\begin{center}	
+			\small			
+			\begin{tabular}{|c|c|c|c|c|c|c|c|}
+				\hline
+				w.word1 & w.word2 & \ldots & w.wordN & c.class1 & \ldots & c.classM & Informacje dodatkowe \\
+				\hline \hline
+				5 & 5 & \ldots & 57 & 2 & \ldots & 2 & (nie dotyczy) \\
+				\hline
+				1 & 0 & \ldots & 3 & 0 & \ldots & 1 & art1.txt \\
+				\hline
+				0 & 2 & \ldots & 0 & 1 & \ldots & 0 & art2.txt \\
+				\hline
+				4 & 3 & \ldots & 54 & 1 & \ldots & 1 & art3.txt \\
+				\hline
+			\end{tabular}	
+			\end{center}				
+		
+			\caption{Format ramki danych utworzonej w wyniki II etapu
+			przetwarzania danych dla trzech plików art1.txt, art2.txt oraz
+			art3.txt}
+			\label{t:df}
+		\end{table}
+		Każdemu plikowi \texttt{.txt} zawierającemu streszczenie i 
+		dziedziny zastosowań będzie odpowiadał pojedynczy wiersz ramki danych.
+		Dodatkowo pierwszy wiersz tabeli nie odpowiada żadnemu plikowi
+		\texttt{.txt}, ale zawiera pomocnicze dane statystyczne.
+		Dokładniej dla danej kolumny zawierającej wartości numeryczne,
+		pierwszy wiersz zawiera sumę elementów pozostałych wierszy w
+		kolumnie.
+		
+		W przypadku kolumn zastosowano następujące kodowanie, kolumna 
+		której nazwa ma format \texttt{w.xxyyzz}, odpowiada słowu
+		\texttt{xxyyzz}. Dla wiersza opisującego streszczenie artykułu
+		kolumna \texttt{w.xxyyzz} zawiera \emph{ilość wystąpień}
+		słowa \texttt{xxyyzz} w streszczeniu.
+		
+		Kolumny o nazwach postaci \texttt{c.xxyyzz} a więc rozpoczynających
+		się od ,,c.'' niosą informacje o dziedzinach zastosowań artykułu.
+		Każda z tych kolumn może zawierać jedynie wartości 1 lub 0, mówiące
+		o tym czy dany artykuł należy do danej klasy (dziedziny zastosowań).
+		
+		W ramce występują również kolumny o nazwach rozpoczynających się od
+		,,meta.'' które niosą informacje dodatkowe takie jak np. nazwa pliku
+		na podstawie którego wygenerowany został dany wiersz tablicy.
+		
+		Zamiana zbioru plików \texttt{.txt} utworzonych w ramach I etapu
+		będzie przebiegała następująco:
+		\begin{enumerate}
+			\item
+				Zamian wszystkich znaków występujących w streszczeniach
+				i nie będących literami na spacje
+			\item
+				Zamiana dużych liter na małe litery, usuwanie wielokrotnych
+				powtórzeń białych znaków, usuwanie białych znaków z początku
+				i końca tekstu streszczenia
+			\item
+				Stemming tekstów za pomocą funkcji \texttt{wordStem}
+				z pakietu \texttt{Rstem}
+			\item
+				Usuwanie \textit{stopwords} (wykorzystano listę
+				angielskich stopwords opublikowaną w internecie,
+				szczegóły znajdują się w pomocy do funkcji \texttt{is.stop.word}
+				)
+			\item
+				Na podstawie tak uzyskanej listy słów alokacja kolumn
+				ramki danych
+			\item
+				Ustalenie występujących w artykułach dziedzin zastosowań
+			\item
+				Tworzenie ramki danych. Dla danego wiersza odpowiadającego
+				streszczeniu X, kolumna typu w.abc odpowiada liczbie wystąpień
+				słowa abc w przetworzonym tekście X, a kolumna c.abc zawiera 
+				1 gdy abc jest dziedziną zastosowań artykułu 
+				którego streszczeniem jest X
+		\end{enumerate}
+		
+		Za wykonanie opisanych wyżej przekształceń odpowiada 
+		funkcja 
+		\begin{verbatim}
+create.aritcles.data.frame(articles.directory, output.df.filename)
+		\end{verbatim}
+		przyjmująca jako parametry ścieżkę do katalogu zawierającego
+		wstępnie przetworzone pliki \texttt{.txt}, oraz ścieżkę do 
+		pliku w którym ma zostać zapisana ramka danych.
+		
+		Ponieważ utworzony plik ramki danych może być znacznych rozmiarów
+		(powyżej 500MB), zalecamy wczytanie ramki danych oraz ponowny 
+		jej zapis w postaci binarnej za pomocą funkcji \texttt{save}.
+		Pozwoli nam to zaoszczędzić czasu związanego z parsowaniem
+		pliku ASCII (utworzony plik ramki ma format tekstowy).
+		\begin{verbatim}
+df <- read.table('articles.df', header=TRUE);
+save(df, file='articles.bin', compress=FALSE);
+		\end{verbatim}		
+				
+		\textsc{UWAGA}: Jeżeli możemy poświęcić dodatkowo 1GB przestrzeni
+		dyskowej to lepiej dokonać zapisu bez kompresji - spowoduje to
+		zmniejszenie obciążenia pamięci podczas wczytywania ramki oraz
+		skrócenie czasu wczytywania danych.
+	
+\section{Wektoryzacja danych}
+		Utworzona w poprzednim punkcie tego dokumentu ramka danych
+		zawiera około 40 tysięcy wierszy oraz ponad 68 tysięcy kolumn.
+		Niestety taki rozmiar danych okazał się zbyt dużym obciążeniem
+		dla wykorzystywanych przez nas algorytmów. Dodatkowo okazało się
+		że większość algorytmów oczekuje pojedynczych etykiet dla danych
+		ze zbioru trenującego. Z tych względów zdecydowaliśmy się 
+		na dodatkowe przetworzenie zbioru danych które pozwoli na jego
+		kompresję oraz rozwiąże problem wielokrotnych kategorii.
+		
+		Najpierw zajmiemy się problemem zbyt dużego rozmiaru danych:
+		\begin{enumerate}
+			\item
+				Usuwamy te kolumny kategorii które są reprezentowane
+				przez mniej niż \texttt{min.n} streszczeń
+			\item
+				Usuwamy kategorie ogólne np. c.OtherApplicationsNEC lub
+				c.OtherSciencesNEC
+			\item
+				Usuwamy wiersze które nie należą do żadnej z kategorii
+				(takie wiersze mogły się pojawić po wykonaniu kroków 1 i 2)
+			\item
+				Usuwamy kolumny odpowiadające słowom które występują
+				w mniej niż \texttt{min.w} razy
+			\item
+				Usuwamy informacje dodatkowe (kolumny rozpoczynające się
+				od ,,meta.'')
+		\end{enumerate}
+		
+		Teraz rozwiążemy problem wielokrotnych kategorii:
+		\begin{enumerate}
+			\item
+				Każdy wiersz który należy do klas $c_1$, $c_2$, \ldots, $c_N$
+				zamieniamy na $N$ wierszy danych takich że pierwszy należy
+				do kategorii $c_1$, drugi do kategorii $c_2$ itd.
+		\end{enumerate}
+		
+		Za przeprowadzenie wyżej opisanych operacji jest
+		odpowiedzialna funkcja \texttt{vectorize.data}:
+		\begin{verbatim}
+lst <- vectorize.data(
+    df, min.n, 
+    create.hash(c("c.OtherApplicationsNEC", "c.OtherSciencesNEC")),
+    min.w);
+		\end{verbatim}
+		
+		Parametry funkcji \texttt{vectorize.data}: \texttt{min.w} oraz
+		\texttt{min.n} zostaną dołączone do parametrów algorytmów
+		które uczą się na zwektoryzowanych danych.
+
+\section{Zastosowane algorytmy}
+	\subsection{Algorytm kNN}
+		
+		Algorytm działa według poniższego ciągu instrukcji:
+		\begin{enumerate}
+			\item
+				Dla każdego wektora $V$ który należy zaklasyfikować
+				wykonuj kroki 2-3
+			\item
+				Znajdź $k$ wektorów ze zbioru trenującego najbliższych 
+				wektorowi $V$ względem zadanej
+				metryki. Oznaczmy ten zbiór $k$ wektorów jako $VN$
+			\item
+				Przydziel wektorowi $V$ kategorię najczęściej występującą 
+				w zbiorze $VN$ (w przypadku występowania więcej niż jednej
+				takiej kategorii, dokonaj wyboru w sposób losowy)
+		\end{enumerate}
+		
+		\subsubsection{Przykład użycia}
+		Poniżej przedstawiamy przykład użycia algorytmu kNN.
+		W poniższych listingach będziemy zakładać że zmienna \texttt{lst}
+		została zwrócona przez funkcje \texttt{vectorize.data}.
+		\begin{verbatim}
+test <- sample(1:nrow(lst$data), 1000, replace=FALSE)
+
+test.data <- lst$data[test,]
+test.cls  <- lst$fact[test]
+row.names(test.data) <- NULL
+
+learn.data <- lst$data[-test,]
+learn.cls  <- lst$fact[-test]
+row.names(learn.data) <- NULL
+
+metric <- metric.euclid;
+# lub
+metric <- metric.cos;
+
+result <- knn2(learn.data, learn.cls, test.data, metric, k=10)
+
+# algorytmy zwraca wektor kategorii
+# dla danych z test.data
+table(result, test.cls)
+		\end{verbatim}
+		
+	
+	\subsection{Algorytm Naive Bayes}
+		Niech $\Omega$ oznacza dziedzinę klasyfikowanych przykładów,
+	a $TR$ zbiór trenujący będący podzbiorem dziedziny.
+	Ponadto dla $x \in \Omega$ niech
+	$c(x) \in C$ oznacza klasę do której należy przykład $x$,
+	a $a_i(x)$ wartość atrybutu o numerze $i$.
+	W naszym przypadku będziemy zakładać że $a_i(x) = 1$ jeżeli słowo
+	odpowiadające kolumnie $i$ występuje w danym streszczeniu, oraz
+	że $a_i(x) = 0$ w przeciwnym wypadku (pierwszym krokiem algorytmu
+	będzie odpowiednie przetworzenie ramki danych tak aby
+	występowały w niej tylko zera i jedynki).
+	
+	Stworzona przez nas wersja algorytmu bezpośrednio
+	implementuje równanie:
+	\[ h(x) = \arg\max_{c \in C}{
+		\log P(c) \cdot \sum_{i=1}^{n} \log P(a_i(x)|c)	
+	} \]
+	gdzie
+	\begin{list}{}{}
+		\item
+			$P(c) = \frac{|TR^c|}{|TR|}$
+		\item
+			$P(a_i(x)|c) = \frac{|TR_{a_i = a_i(x)}^c| + p\cdot |TR^c|}{|TR^c| + |TR^c|}$ \  (dodatkowo stosujemy m-estymacje)
+	
+	\end{list}
+	
+	
+	\textsc{UWAGA}: Jako $p$ możemy podać dowolną liczbę rzeczywistą,
+	możemy również ustawić $p = -1$(przy wywołaniu funkcji) co spowoduje przyjęcie za $p$ wartości $\frac{1}{|TR^c|}$.
+		
+		
+		\subsubsection{Przykład użycia}
+		Poniżej przedstawiamy przykład użycia Naiwnego Klasyfikatora Bayesowskiego.
+		W poniższych listingach będziemy zakładać że zmienna \texttt{lst}
+		została zwrócona przez funkcje \texttt{vectorize.data}.
+		\begin{verbatim}
+test <- sample(1:nrow(lst$data), 1000, replace=FALSE)
+
+test.data <- lst$data[test,]
+test.cls  <- lst$fact[test]
+row.names(test.data) <- NULL
+
+learn.data <- lst$data[-test,]
+learn.cls  <- lst$fact[-test]
+row.names(learn.data) <- NULL
+
+# ramka powinna zawierac krotnosci wystapien
+# slow
+model <- train.naive.bayes(learn.data, learn.cls, p)
+
+# algorytmy zwracaja tablice p-stwa
+# przenaleznosci przykladu do poszczegolnych
+# klas
+p <- predict(model, test.data);
+p2 <- apply(p, 1, function(r) which(r == max(r)))
+table(p2, test.cls)
+		\end{verbatim}
+	
+	\subsection{Algorytm Multinomial Bayes}	
+		Oba zaprezentowane tutaj algorytmy pochodzą z
+		13 rozdziału pozycji \cite{irbook}.
+	
+		\subsubsection{Wersja I}
+		\begin{figure}[!h]
+			\centering
+			\includegraphics[scale=0.45]{./img/mnbalg}
+			\caption{Pseudokod algorytmu Multinomial Naive Bayes}
+		\end{figure}
+		
+		\subsubsection{Wersja II}
+		\begin{figure}[!h]
+			\centering
+			\includegraphics[scale=0.45]{./img/bnbalg}
+			\caption{Pseudokod algorytmu Bernoulli Naive Bayes}
+		\end{figure}
+		\clearpage		
+
+		\subsubsection{Przykład użycia}
+		Poniżej przedstawiamy przykład użycia poszczególnych algorytmów.
+		W poniższych listingach będziemy zakładać że zmienna \texttt{lst}
+		została zwrócona przez funkcje \texttt{vectorize.data}.
+		\begin{verbatim}
+test <- sample(1:nrow(lst$data), 1000, replace=FALSE)
+
+test.data <- lst$data[test,]
+test.cls  <- lst$fact[test]
+row.names(test.data) <- NULL
+
+learn.data <- lst$data[-test,]
+learn.cls  <- lst$fact[-test]
+row.names(learn.data) <- NULL
+
+model <- train.multinomial.nb(data=learn.data, fact=learn.cls)
+# lub
+model <- train.bernoulli.nb(data=learn.data, fact=learn.cls)
+
+# algorytmy zwracaja tablice p-stwa
+# przenaleznosci przykladu do poszczegolnych
+# klas
+p <- predict(model, test.data);
+p2 <- apply(p, 1, function(r) which(r == max(r)))
+table(p2, test.cls)
+		\end{verbatim}
+		
+		
+	
+\section{Wykorzystywane algorytmy pakietu R}
+
+	\subsection{Funkcja \texttt{naiveBayes} z pakietu \texttt{e1071}}
+	
+	Sygnatura funkcji \texttt{naiveBayes} wygląda następująco:
+\begin{verbatim}
+naiveBayes(formula, data, laplace = 0, ..., subset, na.action = na.pass)
+\end{verbatim}
+	Funkcja była wywoływana na dokładnie tych samych danych co
+	pozostałe algorytmy. 
+	
+	Poniżej przedstawiamy przykładowe 
+	wywołanie funkcji przy założeniu że zmienna \texttt{lst}
+	została zwrócona przez funkcje \texttt{vectorize.data}.
+\begin{verbatim}
+data <- lst$data;
+tmp  <- colnames(lst$data);
+data$class <- lst$fact;
+
+formula.string <- paste(tmp, collapse=' + ');
+formula.string <- paste('class ~', formula.string);
+f <- formula(formula.string);
+
+model <- naiveBayes(f, data, laplace);
+\end{verbatim}
+	
+	\subsection{Funkcja \texttt{rpart} z pakietu \texttt{rpart}}
+	
+	Funkcja \texttt{rpart} buduje modele klasyfikacji w oparciu 
+	o drzewa decyzyjne, sygnatura funkcji wygląda następująco:
+\begin{verbatim}
+rpart(formula, data, weights, subset, na.action = na.rpart, method,
+      model = FALSE, x = FALSE, y = TRUE, parms, control, cost, ...)
+\end{verbatim}
+	
+	Funkcja była wywoływana w następujący sposób:
+\begin{verbatim}
+data <- lst$data;
+tmp  <- colnames(lst$data);
+data$class <- lst$fact;
+
+formula.string <- paste(tmp, collapse=' + ');
+formula.string <- paste('class ~', formula.string);
+f <- formula(formula.string);
+
+model <- rpart(f, data, method="class");
+\end{verbatim}
+
+	\subsection{Funkcja \texttt{knn} z pakietu \texttt{class}}
+	
+	Funkcja \texttt{knn} implementuje algorytm k-najbliższych sąsiadów
+	\textbf{z metryką euklidesową},
+	sygnatura funkcji wygląda następująco:
+\begin{verbatim}
+knn(train, test, cl, k = 1, l = 0, prob = FALSE, use.all = TRUE)
+\end{verbatim}
+
+	Funkcja była wywoływana w następujący sposób (\texttt{k} i 
+	\texttt{l} stanowią parametry
+	algorytmu)
+\begin{verbatim}
+test <- sample(1:nrow(lst$data), 900, replace=FALSE)
+
+test.data <- lst$data[test,]
+test.cls  <- lst$fact[test]
+row.names(test.data) <- NULL
+
+learn.data <- lst$data[-test,]
+learn.cls  <- lst$fact[-test]
+row.names(learn.data) <- NULL
+
+result <- knn(learn.data, test.data, learn.cls, k, l)
+
+# funkcja knn jako wynik klasyfikacji
+# moze zwrocic wartosc NA
+result.na <- is.na(result);
+result    <- result[!result.na];
+test      <- test[!result.na];
+
+class.error(result, test, lst)
+\end{verbatim}
+
+\section{Uzyskane wyniki}
+
+	\subsection{Sposób obliczania błędów}
+	
+		Za sposób obliczania błędu klasyfikacji 
+		odpowiedzialne są metody \texttt{class.error} oraz
+		\texttt{mclass.error}. Pierwsza z nich operuje na
+		pojedynczym faktorze zawierającym klasyfikacje 
+		przykładów ze zbioru testowego. Druga - \texttt{mclass.error} - 
+		operuje na tablicy prawdopodobieństw przynależności przykładu
+		do poszczególnych klas.
+		
+		Obie funkcje zwracają listę zawierającą następujące pola:
+		\begin{description}
+			\item[\$good] 
+				Określa liczbę poprawnie klasyfikowanych elementów.
+				Zakładamy że element jest poprawnie klasyfikowany 
+				jeżeli zostanie mu nadana jedna z etykiet dziedzin
+				do których naprawdę należy. Na przykład jeżeli
+				dany wiersz opisuje artykuł którego dziedzinami
+				zastosowań są biologia i chemia, to przypisanie 
+				mu klasy biologia lub klasy chemia jest uznawane 
+				za poprawną klasyfikacje
+			\item[\$bad]
+				Określa liczbę przykładów które nie zostały poprawnie
+				zaklasyfikowane
+			\item[\$skipped]
+				Ponieważ w wyniku procesu wektoryzacji danych, dany 
+				wiersz może występować w danych testowych wielokrotnie
+				(obniżając w ten sposób jakość klasyfikatora) to zdecydowaliśmy
+				się uwzględniać tylko jedno wystąpienie każdego wiersza.
+				To pole mówi ile łącznie powtórek należało odrzucić
+				(zwykle wartość tego pola nie powinna przekraczać 5\% wielkości
+				zbioru testowego)
+		\end{description}
+
+		Jako miarę oceny jakości klasyfikatora postanowiliśmy przyjąć
+		procent poprawnie klasyfikowanych przykładów w stosunku do 
+		wszystkich przykładów:
+		\[ \text{error} = \frac{\text{bad}}{\text{good}+\text{bad}} \]
+		
+		Dodatkowo dla przypadku niewielkiej liczby klas (maksymalnie 5)
+		będziemy podawać macierze błędów, ze względu na ich 
+		duży potencjał informacyjny.
+		
+	\subsection{Wyniki: Średni zbiór danych (SZD)}
+		Niestety podczas testów okazało się że pełny zbiór danych
+		wygenerowany według procedury opisanej w sekcjach 2 - 3 jest
+		zbyt duży jak na możliwości obliczeniowe komputerów którymi dysponujemy.
+		Dlatego testy przeprowadzimy na mniejszym zbiorze
+		artykułów, składającym się z pierwszych 10 tysięcy plików
+		wygenerowanych na etapie 2.2 (pierwsze 10 tysięcy plików według
+		porządku leksykograficznego po nazwach).
+		
+		Aby uwolnić czytelnika od uciążliwego procesu przetwarzania 
+		danych, dane na których przeprowadziliśmy testy są 
+		dostępne online.
+		Ramka danych reprezentująca SZD
+		zapisana w formacie binarnym języka R i skompresowana
+		za pomocą programu WinRAR jest do końca czerwca bieżącego roku
+		dostępna pod adresem: \url{http://gamma.mini.pw.edu.pl/~chwedczukm/szd.rar}
+		(rozmiar 2.7 MB). Archiwum powinno zawierać pojedynczy plik o nazwie
+		\texttt{articles.bin}.
+		
+		W ramach testów przyjęliśmy rozmiar zbioru testowego równy 1000
+		(około 20 \% całości danych).
+		Podział na zbiór testowy oraz uczący został dokonany w sposób
+		losowy i był taki sam dla każdego z testowanych algorytmów
+		(algorytmy uczyły się i były testowane na tych samych wierszach).
+		Poniżej przedstawiamy kod odpowiedzialny za dokonanie 
+		podziału danych:
+		\begin{verbatim}
+lst  <- vectorize.data(...)
+test <- sample(1:nrow(lst$data), 1000, replace=FALSE)
+
+test.data <- lst$data[test,]
+test.cls  <- lst$fact[test]
+row.names(test.data) <- NULL
+
+learn.data <- lst$data[-test,]
+learn.cls  <- lst$fact[-test]
+row.names(learn.data) <- NULL
+		\end{verbatim}
+		
+		\textsc{UWAGA}: Liczba powtórzonych wierszy wynikających z procesu wektoryzacji
+		w prezentowanych zbiorach testowych wynosiła zawsze 8, a więc nie była znacząca.
+		W dalszych rozważaniach będziemy traktować klasy dokumentów jako rozłączne.
+		
+		\subsubsection{Wektoryzacja z parametrami \texttt{min.n}=700 i
+		 \texttt{min.w}=100}
+		 
+		 Wektoryzacji dokonano za pomocą poleceń:
+		 \begin{verbatim}
+load('articles.bin');
+v <- vectorize.data(df, 700, 
+	create.hash(c("c.OtherApplicationsNEC", "c.OtherSciencesNEC")),
+	100) 
+		 \end{verbatim}
+		 
+		 Przycięty zbiór danych zawiera ponad \textbf{850} kolumn odpowiadających słowom,
+		 oraz ponad 5 tysięcy wierszy odpowiadających streszczeniom.
+		 
+		 W zbiorze danych znalazło się pięć kategorii: c.Chemistry, 		 
+		 c.GeologicalSciences, c.LifeScienceBiological, c.Mathematics
+		 oraz c.Physics. Rozkład kategorii został przedstawiony na 
+		 rysunku \ref{fig:v1hist}
+		 \begin{figure}[!h]
+		 	\centering
+		 		\includegraphics[width=\textwidth]{./img/v1_cats}
+		 	\caption{Rozkład kategorii w zbiorze danych}
+		 	\label{fig:v1hist}
+		 \end{figure}
+		 
+		 \subsubsection{Rezultaty dla zwektoryzowanego zbioru danych}
+		 
+		\begin{table}[!h]
+			\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		& Chemistry & GeologicalSciences & LifeScience &
+		 			 Mathematics & Physics \\
+		 		\hline
+		 		Chemistry &146&2&20&1&14 \\
+		 		GeologicalSciences & 0&148&5&2&0 \\
+		 		LifeScience&3&3&255&2&1\\
+  				Mathematics&0&0&0&177&3\\
+  				Physics&19&12&25&50&112\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu Naive Bayes. 
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}	
+		 
+	 
+		 
+		 \begin{table}[!h]
+			\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		& Chemistry & GeologicalSciences & LifeScience &
+		 			 Mathematics & Physics \\
+		 		\hline
+		 		Chemistry & 139 & 2 & 19 & 0 & 16 \\
+		 		GeologicalSciences & 0&152&8&4&1 \\
+		 		LifeScience&4&2&261& 2&1\\
+  				Mathematics&0&1&2&205&11\\
+  				Physics&25&8&15&21&101\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu Multinomial Naive Bayes. 
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&144&2&18&0&15\\
+  				GeologicalSciences&2&148&6&4&0\\
+  				LifeScience&4&3&260& 1&1\\
+  				Mathematics&1&1&3&206&12\\
+  				Physics&17&11 &18&21&102\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu Bernoulli Naive Bayes. 
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry& 83&3&15 &5&12\\
+  				GeologicalSciences&5&97&9&0&2\\
+  				LifeScience&47&58&259&61&54\\
+  				Mathematics& 9&2&8&158&4\\
+  				Physics&24&5&14&8&58\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu kNN  
+		 	z parametrem k = 10 i metryką euklidesową.
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry& 2 &17&18&17&2\\
+  				GeologicalSciences&58 &16&84&115&64\\
+  				LifeScience&9 &11&8 &23&6\\
+  				Mathematics&77 &78&112&22&42\\
+  				Physics&22 &43&83&55&16\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu kNN  
+		 	z parametrem k = 10 i metryką cosinus'ową.
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 % Wbudowane algorytmu
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&89&4&11&4&14\\
+  				GeologicalSciences&5&57&6&1&1\\
+  				LifeScience&45&97&270&66&56\\
+  				Mathematics&6&1&5&149&9\\
+  				Physics&23&6&13&12&50\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu kNN z pakietu \texttt{class} 
+		 	z parametrem k = 5.
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&74&3&14&3 &7\\
+  				GeologicalSciences&5&82&8&0&3\\
+  				LifeScience&50 &68&259&54 & 46\\
+  				Mathematics&9 & 2 &10&165&6\\
+  				Physics&30&10&14&10&68\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu kNN z pakietu \texttt{class} 
+		 	z parametrem k = 10.
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&128&13&16&4&15\\
+  				GeologicalSciences&21&122&57&20&33\\
+  				LifeScience&10&12&208&6&5\\
+  				Mathematics&5&9 & 15&189&16\\
+  				Physics&4 & 9&  9& 13&61\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu rpart z pakietu \texttt{rpart} .
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&92&5&24&1&8\\
+  				GeologicalSciences&1&121&24&1&4\\
+  				LifeScience&0&3 & 174 & 1& 0\\
+  				Mathematics&5 & 5 & 23 & 195 & 19\\
+  				Physics&70 & 31 & 60 & 34 & 99\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu NB (naive bayes) z pakietu \texttt{e1071} .
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+			\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		& Chemistry & GeologicalSciences & LifeScience &
+		 			 Mathematics & Physics \\
+		 		\hline
+		 		Chemistry &98&4&36&1&10 \\
+		 		GeologicalSciences & 1&128&21&4&2 \\
+		 		LifeScience&2&1&194&1&1\\
+  				Mathematics&4&2&18&191&14\\
+  				Physics&63&30&36&35&103\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu NB (naive bayes) z pakietu \texttt{e1071}
+		 	dla danych binarnych
+		 	(dane binarne uzyskano za pomocą wywołania funkcji \texttt{sign} 
+		 	na ramce danych).
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&32&32&68&49&27\\
+  				GeologicalSciences& 24&38&56&40 &19\\
+  				LifeScience&34&32&58 &52&28\\
+  				Mathematics&43&27&62&44&20\\
+  				Physics&35&36&61&47&36\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu przydzielającego etykiety
+		 	w sposób losowy.
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}	
+		 	\centering	 	
+		 	\begin{tabular}{|l|l|}
+		 		\hline
+		 		Nazwa algorytmu & Współczynnik error \\
+		 		\hline
+		 			Naiwny Bayes binarny (NB) & 0.1401 \\
+		 			Multinomial NB & 0.1219 \\
+		 			Bernoulli NB & 0.1169 \\
+		 			kNN k=10 euklides & 0.3215 \\
+		 			kNN k=10 cosinus & 0.9314 \\
+		 		\hline
+		 			kNN (class) k=5 & 0.3588 \\
+		 			kNN (class) k=10 & 0.3306 \\
+		 			rpart (rpart) & 0.2691 \\
+					NB (e1071) & 0.3034 \\	
+					NB (e1071) + dane binarne & 0.2681 \\
+				\hline
+					Przydział losowy & 	0.7812 \\ 			
+		 		\hline
+		 	\end{tabular}
+		 	\caption{Tabela prezentuje wartość współczynnika error dla
+		 	każdego z testowanych algorytmów}
+		 \end{table}
+		 
+		 \clearpage
+		 \newpage
+		 
+		 \subsubsection{Wektoryzacja z parametrami \texttt{min.n}=700 i
+		 \texttt{min.w}=40}
+		 
+		 Wektoryzacji dokonano za pomocą poleceń:
+		 \begin{verbatim}
+load('articles.bin');
+v <- vectorize.data(df, 700, 
+	create.hash(c("c.OtherApplicationsNEC", "c.OtherSciencesNEC")),
+	40) 
+		 \end{verbatim}
+		 
+		 Przycięty zbiór danych zawiera około \textbf{1700} kolumn odpowiadających
+		 słowom,
+		 oraz ponad 5 tysięcy wierszy odpowiadających streszczeniom.
+		 
+		 W zbiorze danych znalazło się pięć kategorii: c.Chemistry, 		 
+		 c.GeologicalSciences, c.LifeScienceBiological, c.Mathematics
+		 oraz c.Physics. Rozkład kategorii został przedstawiony na 
+		 rysunku \ref{fig:v2hist}
+		 \begin{figure}[!h]
+		 	\centering
+		 		\includegraphics[width=\textwidth]{./img/v2_cats}
+		 	\caption{Rozkład kategorii w zbiorze danych}
+		 	\label{fig:v2hist}
+		 \end{figure}
+		 
+		 \subsubsection{Rezultaty dla zwektoryzowanego zbioru danych}
+		 
+		 % Wersja 2
+		 
+		 \begin{table}[!h]
+			\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		& Chemistry & GeologicalSciences & LifeScience &
+		 			 Mathematics & Physics \\
+		 		\hline
+		 		Chemistry &146&2&20&1&14 \\
+		 		GeologicalSciences & 0&148&5&2&0 \\
+		 		LifeScience&3&3&255&2&1\\
+  				Mathematics&0&0&0&177&3\\
+  				Physics&19&12&25&50&112\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu Naive Bayes. 
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+
+		 
+		 \begin{table}[!h]
+			\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		& Chemistry & GeologicalSciences & LifeScience &
+		 			 Mathematics & Physics \\
+		 		\hline
+		 		Chemistry & 139&2&20&0&15 \\
+		 		GeologicalSciences & 1 & 153 & 6 & 3& 1 \\
+		 		LifeScience& 4 & 2& 262 & 3&1\\
+  				Mathematics&0 & 1 & 4 & 204 & 5\\
+  				Physics&24 & 7 & 13 & 22 &108\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu Multinomial Naive Bayes. 
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&143&3&18&0&11\\
+  				GeologicalSciences&0 &150& 4 & 2&1\\
+  				LifeScience&4 & 2 & 264 & 1& 1\\
+  				Mathematics&1 & 1 & 3 &205 &7\\
+  				Physics&20 & 9 & 16&24&110\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu Bernoulli Naive Bayes. 
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		\begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&81&4& 14&5&10\\
+  				GeologicalSciences& 5&83 &8&0&2\\
+  				LifeScience&54&72&258&71&55\\
+  				Mathematics&10&1&10&141&8\\
+  				Physics&18&5&15&15&55\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu kNN  
+		 	z parametrem k = 10 i metryką euklidesową.
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry& 2&17&20&18&2\\
+  				GeologicalSciences&57&17&84&114&63\\
+  				LifeScience&8&11&8&22&7\\
+  				Mathematics&78&81&108&21&42\\
+  				Physics&23&39&85&57&16\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu kNN  
+		 	z parametrem k = 10 i metryką cosinus'ową.
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}		 
+		 
+		 % Wbudowane algorytmu
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&83&4&13&3&14\\
+  				GeologicalSciences&5&46&10&1&1\\
+  				LifeScience&53&109&262&77&58\\
+  				Mathematics&8&0& 8&139&8\\
+  				Physics&19&6&12&12&49\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu kNN z pakietu \texttt{class} 
+		 	z parametrem k = 5.
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&69 & 2 & 12 & 3 & 8\\
+  				GeologicalSciences&5& 71 & 5 & 0 &1\\
+  				LifeScience&59 & 87 & 259 & 60&54\\
+  				Mathematics&9 &1 & 13 & 154 & 10\\
+  				Physics&26 & 4 & 16& 15& 57\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu kNN z pakietu \texttt{class} 
+		 	z parametrem k = 10.
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&128&13&16&4&15\\
+  				GeologicalSciences&21&122&57&20&33\\
+  				LifeScience&10&12&208&6&5\\
+  				Mathematics&5&9 & 15&189&16\\
+  				Physics&4 & 9&  9& 13&61\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu rpart z pakietu \texttt{rpart} .
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry& 66 & 1  & 35 &0 &7\\
+  				GeologicalSciences&2 &109 & 37 &3&3\\
+  				LifeScience&0 & 1  & 66  &1 &0\\
+  				Mathematics&6 & 8 & 32 &186 &13\\
+  				Physics& 94 & 46 & 135 &42 &107\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu NB (naive bayes) z pakietu \texttt{e1071} .
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 		 \begin{table}[!h]
+			\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		& Chemistry & GeologicalSciences & LifeScience &
+		 			 Mathematics & Physics \\
+		 		\hline
+		 		Chemistry &72&2&37&1&7 \\
+		 		GeologicalSciences & 1&113&39&1&1 \\
+		 		LifeScience&0&0&90&0&0\\
+  				Mathematics&3&5&20&189&9\\
+  				Physics&92&45&119&41&113\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu NB (naive bayes) z pakietu 
+		 	\texttt{e1071} dla danych binarnych
+		 	(dane binarne uzyskano za pomocą wywołania funkcji \texttt{sign} 
+		 	na ramce danych).
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&39&39 &60&42&25\\
+  				GeologicalSciences&33&32&62&49&21\\
+  				LifeScience&25&31&57&47&27\\
+  				Mathematics&41&38&58&45&27\\
+  				Physics&30&25&68&49&30\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu przydzielającego etykiety
+		 	w sposób losowy.
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering	 	
+		 	\begin{tabular}{|l|l|}
+		 		\hline
+		 		Nazwa algorytmu & Współczynnik error \\
+		 		\hline
+		 			Naiwny Bayes binarny (NB) & 0.1401 \\
+		 			Multinomial NB & 0.1108	 \\
+		 			Bernoulli NB & 0.1048 \\
+		 			kNN k=10 euklides & 0.3618 \\
+		 			kNN k=10 cosinus & 0.9304 \\
+		 		\hline
+		 			kNN (class) k=5 & 0.3981 \\
+		 			kNN (class) k=10 & 0.3709 \\
+		 			rpart (rpart) & 0.2691 \\
+					NB (e1071) & 0.4485 \\	
+					NB (e1071) + dane binarne & 0.4062 \\
+				\hline
+					Przydział losowy & 0.7802 \\	 			
+		 		\hline
+		 	\end{tabular}
+		 	\caption{Tabela prezentuje wartość współczynnika error dla
+		 	każdego z testowanych algorytmów}
+		 \end{table}
+		 
+		 \clearpage
+		 \newpage
+		 \subsubsection{Wektoryzacja z parametrami \texttt{min.n}=700 i
+		 \texttt{min.w}=10}
+		 
+		  Wektoryzacji dokonano za pomocą poleceń:
+		 \begin{verbatim}
+load('articles.bin');
+v <- vectorize.data(df, 700, 
+	create.hash(c("c.OtherApplicationsNEC", "c.OtherSciencesNEC")),
+	10) 
+		 \end{verbatim}
+		 
+		 Przycięty zbiór danych zawiera około \textbf{3900} kolumn odpowiadających
+		 słowom,
+		 oraz ponad 5 tysięcy wierszy odpowiadających streszczeniom.
+		 
+		 W zbiorze danych znalazło się pięć kategorii: c.Chemistry, 		 
+		 c.GeologicalSciences, c.LifeScienceBiological, c.Mathematics
+		 oraz c.Physics. Rozkład kategorii został przedstawiony na 
+		 rysunku \ref{fig:v3hist}
+		 \begin{figure}[!h]
+		 	\centering
+		 		\includegraphics[width=\textwidth]{./img/v3_cats}
+		 	\caption{Rozkład kategorii w zbiorze danych}
+		 	\label{fig:v3hist}
+		 \end{figure}
+		 
+		 \subsubsection{Rezultaty dla zwektoryzowanego zbioru danych}
+		 
+		  % Wersja 33333
+		\begin{table}[!h]
+			\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		& Chemistry & GeologicalSciences & LifeScience &
+		 			 Mathematics & Physics \\
+		 		\hline
+		 		Chemistry &146&2&20&1&14 \\
+		 		GeologicalSciences & 0&148&5&2&0 \\
+		 		LifeScience&3&3&255&2&1\\
+  				Mathematics&0&0&0&177&3\\
+  				Physics&19&12&25&50&112\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu Naive Bayes. 
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}		  
+		  
+		 \begin{table}[!h]
+			\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		& Chemistry & GeologicalSciences & LifeScience &
+		 			 Mathematics & Physics \\
+		 		\hline
+		 		Chemistry & 139 & 3 & 20 & 0& 14 \\
+		 		GeologicalSciences & 1&154& 5 &2&0 \\
+		 		LifeScience& 3 & 2 &263 & 2& 1\\
+  				Mathematics&1 & 1 & 4 &209&8\\
+  				Physics&24 &5 &13 &19&107\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu Multinomial Naive Bayes. 
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&142 &2&17 & 0&9\\
+  				GeologicalSciences&0&150 & 4&1&0\\
+  				LifeScience&3 & 2& 263& 1&1\\
+  				Mathematics&1 & 2 &4 &208 &9\\
+  				Physics&22& 9  & 17&22 &111\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu Bernoulli Naive Bayes. 
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		\begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry& 69&3&13&4&10\\
+  				GeologicalSciences&4&52&2&0&1\\
+  				LifeScience&70&108&272&81&66\\
+  				Mathematics& 7&1&7&134&7\\
+  				Physics&18&1&11&13&46\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu kNN  
+		 	z parametrem k = 10 i metryką euklidesową.
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 	\label{tab:blah1}
+		 \end{table}		 
+		 
+		 % Wbudowane algorytmu
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&69 & 3 &12 &3 &12\\
+  				GeologicalSciences&4& 37 &4 &1&1\\
+  				LifeScience&65 & 124 &269&85&66\\
+  				Mathematics&9 & 0 & 8 &132 &4\\
+  				Physics& 21 &1 &12&11&47\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu kNN z pakietu \texttt{class} 
+		 	z parametrem k = 5.
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&62 & 2 & 10 & 3 &8\\
+  				GeologicalSciences&1 & 44&  2 & 0 & 1\\
+  				LifeScience&70 &115&272&72&60\\
+  				Mathematics&8 & 1&11&143& 8\\
+  				Physics&27 & 3 & 10 &14&53\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu kNN z pakietu \texttt{class} 
+		 	z parametrem k = 10.
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&128&13&16&4&15\\
+  				GeologicalSciences&21&122&57&20&33\\
+  				LifeScience&10&12&208&6&5\\
+  				Mathematics&5&9 & 15&189&16\\
+  				Physics&4 & 9&  9& 13&61\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu rpart z pakietu \texttt{rpart} .
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		 \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry& 22& 2 &12& 0&1\\
+  				GeologicalSciences&0&30 &6  &1 &1\\
+  				LifeScience&0 & 0&0 &0& 0 \\
+  				Mathematics& 7&17 & 27 &167 & 10\\
+  				Physics& 139&116 & 260& 64& 118\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu NB (naive bayes) z pakietu \texttt{e1071} .
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		  \begin{table}[!h]
+		 	\centering
+		 	\small
+		 	\begin{tabular}{|l|r|r|r|r|r|}
+		 		\hline
+		 		 & Chemistry & GeologicalSciences & LifeScience &
+		 			Mathematics & Physics \\
+		 		\hline
+  				Chemistry&26&27&66&40&19\\
+  				GeologicalSciences&29&38&81&48&23\\
+  				LifeScience&42&35&59 &47&34\\
+  				Mathematics&36&31&53&45&30\\
+  				Physics&35&34&46&52& 24\\
+  				\hline
+		 	\end{tabular}
+		 	\caption{Macierz pomyłek dla algorytmu przydzielającego etykiety
+		 	w sposób losowy.
+		 	Kolumny reprezentują prawdziwe kategorie przykładów, wiersze
+		 	przewidywane kategorie}
+		 \end{table}
+		 
+		
+		 
+		 \begin{table}[!h]
+		 	\centering	 	
+		 	\begin{tabular}{|l|l|}
+		 		\hline
+		 		Nazwa algorytmu & Współczynnik error \\
+		 		\hline
+		 			Naiwny Bayes (NB) & 0.1401 \\
+		 			Multinomial NB & 0.1018	 \\
+		 			Bernoulli NB & 0.1008 \\
+		 			kNN k=10 euklides & 0.4052 \\
+		 		\hline
+		 			kNN (class) k=5 & 0.4193 \\
+		 			kNN (class) k=10 & 0.4052 \\
+		 			rpart (rpart) & 0.2691 \\
+					NB (e1071) & 0.6532 \\	
+				\hline
+					Przydział losowy & 	0.8014 \\	
+		 		\hline
+		 	\end{tabular}
+		 	\caption{Tabela prezentuje wartość współczynnika error dla
+		 	każdego z testowanych algorytmów}
+		 \end{table}
+		 
+		 \clearpage
+		 \newpage
+\section{Wnioski}
+% duzo kolumn -> nadmierne dopasowanie
+% algorytmy specjalnie przystosowane do tekstu sa lepsze
+
+	\begin{itemize}
+		\item
+			Algorytmy z rodziny naiwnych klasyfikatorów bayesowskich
+			okazały się najlepiej przystosowane do badanego zagadnienia
+			osiągając(w najlepszym wypadku) około 90\% skuteczność działania. 
+			W przypadku tej rodziny algorytmów uwzględnianie coraz to większej
+			liczby słów powodowało jedynie małą poprawę jakości klasyfikacji.
+		\item
+			Najlepszymi badanymi algorytmami okazały się algorytmy 
+			Bernoulli Naive Bayes oraz Multinomial Naive Bayes z lekką przewagą
+			tego pierwszego. A więc zdecydowanie najlepiej wypadły algorytmy 
+			specjalnie przygotowane do przetwarzania tekstu.
+		\item
+			Nasza implementacja naiwnego klasyfikatora bayesowskiego osiągnęła
+			85\% skuteczność działania przy zastosowaniu danych binarnych.
+			Implementacja klasyfikatora z biblioteki \texttt{e1071} znacznie
+			odstawała od czołówki, a w przypadku ostatniego(największego) zbioru
+			danych w ogóle nie ukończyła działania w rozsądnym czasie.
+			Wydaje się że winić należy w tym wypadku niestaranną implementację algorytmu. 
+			
+		\item
+			Drugim co do jakości uzyskiwanych hipotez algorytmem okazał się 
+			\texttt{rpart} osiągając 75\% skuteczność klasyfikacji.
+			Niestety z powodu ograniczeń czasowych nie byliśmy w stanie 
+			lepiej dopasować(wykorzystać) rozbudowanych opcji algorytmu.
+			\emph{Wydaje się nam}, iż algorytm ten ma duży potencjał i przy staranniejszym
+			doborze parametrów byłby w stanie konkurować z klasyfikatorami bayesowskimi.
+			
+			
+		\item
+			Algorytmy z rodziny kNN dla testowanego zakresu parametrów i metryki
+			euklidesowej uzyskiwały zazwyczaj
+			wyniki na poziomie 60 - 65\%. Przy zastosowaniu metryki kosinusowej algorytmy
+			z rodziny kNN uzyskiwały czasami wyniki gorsze niż losowy przydział kategorii!
+		
+		\item
+			Ponieważ w naszych danych jedna z klas (c.LifeScienceBiological) była
+			około dwa razy liczniejsza od pozostałych klas, algorytmy z rodzinny kNN
+			miały skłonność do częstszego typowania tej liczniejszej klasy - co odbijało
+			się niekorzystnie na jakości klasyfikacji (zobacz np. tabela \ref{tab:blah1})
+			
+		\item
+			Zwiększenie liczby sąsiadów z 5 do 10, lekko poprawiło jakość klasyfikacji.
+			Nasza implementacja algorytmu kNN również okazała się odrobinę lepsza od
+			wersji z biblioteki \texttt{class} (choć mógł tutaj działać niedeterminizm
+			związany z rozstrzyganiem konfliktów w przepadku równej liczby głosów w kNN)
+			
+		\item
+			Dla porównania wyników dodajmy jeszcze że algorytm przydzielający etykiety
+			w sposób losowy uzyskał około 20\% skuteczność
+			
+		\item
+			W przypadku większości testowanych algorytmów zwiększanie liczby
+			wykorzystywanych słów nie poprawia w zdecydowany sposób jakości
+			budowanych hipotez. Co gorsza duża liczba słów wydłuża czas działania,
+			obciąża pamięć oraz może prowadzić do budowy hipotez nadmiernie dopasowanych.
+	\end{itemize}
+	
+	
+
+% --------------------------------------------
+% BIBLIOGRAFIA
+% --------------------------------------------
+
+\begin{thebibliography}{9}
+
+\bibitem{abstracts}
+   \emph{NSF Research Award Abstracts 1990-2003 Data Set}.
+   \url{http://archive.ics.uci.edu/ml/datasets/NSF+Research+Award+Abstracts+1990-2003}
+\bibitem{irbook}
+	\emph{An Introduction to Information Retrieval}. 
+	C. D. Manning, P. Raghavan, H. Sch\"utze.
+	Cambridge University Press.
+	Wersja online: \url{http://nlp.stanford.edu/IR-book/html/htmledition/irbook.html}
+\bibitem{wikistemming}
+	Wikipedia, Stemming, \url{http://en.wikipedia.org/wiki/Stemming}
+
+\end{thebibliography}
+
+
+\end{document}
