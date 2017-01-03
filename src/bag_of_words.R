@@ -105,7 +105,7 @@ stem.abstract.text <- function(abstract.text) {
 	MAX.WORD.LENGTH <- 255;
 	abstract.text   <- abstract.text[
 		nchar(abstract.text) < MAX.WORD.LENGTH &  # NIE MOZE BYC &&
-		nchar(abstract.text) > 0
+		nchar(abstract.text) > 3
 	];
 
 	return(wordStem(abstract.text, language="english"));
@@ -189,7 +189,7 @@ compute.global.stats <- function(articles.directory) {
 
 	articles <- list.files(
 		path=articles.directory, 
-		pattern="*.txt",
+		pattern="*",
 		full.names=TRUE,
 		ignore.case=TRUE
 		);
@@ -303,7 +303,7 @@ add.article.row <- function(art, stats, file) {
 add.article.rows <- function(art.stats, file, articles.directory) {
 	articles <- list.files(
 		path=articles.directory, 
-		pattern="*.txt",
+		pattern="*",
 		full.names=TRUE,
 		ignore.case=TRUE
 		);

@@ -1,3 +1,5 @@
+library(stringi)
+
 # preproces.r
 #
 # Plik odpowiada za wstepne przetworzenie artykulow 
@@ -10,6 +12,29 @@
 #
 # !mc
 #
+
+klasy = c("alt.atheism",
+          "comp.graphics",
+          "comp.os.ms-windows.misc",
+          "comp.sys.ibm.pc.hardware",
+          "comp.sys.mac.hardware",
+          "comp.windows.x",
+          "misc.forsale",
+          "rec.autos",
+          "rec.motorcycles",
+          "rec.sport.baseball",
+          "rec.sport.hockey",
+          "sci.crypt",
+          "sci.electronics",
+          "sci.med",
+          "sci.space",
+          "soc.religion.christian",
+          "talk.politics.guns",
+          "talk.politics.mideast",
+          "talk.politics.misc",
+          "talk.religion.misc");
+
+
 
 # FUNC append.slash(dir.path)
 #
@@ -55,19 +80,37 @@ cat.lines <- function(lines, sep=' ') {
 # wyodrebnia z pliku linie zwiazane z wlasciwoscia
 # Fld Applictn
 #
-extract.field.of.application.lines <- function(lines) {
-	tmp <- grep("^Fld Applictn[ \t]*:", lines);
-	start <- tmp[1];
+extract.field.of.application.lines.xref <- function(lines) {
+  tmp <- grep("^Xref[ \t]*:", lines);
+  if (is.na(tmp[1])){
+    return( "" );
+  }
+  start <- tmp[1];
+  
+  stop  <- NA;
+  for(i in (start+1):length(lines)) {
+    if(length(grep(":", lines[i])) > 0) {
+      stop <- i - 1;
+      break;
+    }
+  }
+  
+  return( lines[start:stop] );
+}
 
-	stop  <- NA;
-	for(i in (start+1):length(lines)) {
-		if(length(grep(":", lines[i])) > 0) {
-			stop <- i - 1;
-			break;
-		}
-	}
-
-	return( lines[start:stop] );
+extract.field.of.application.lines.newsgoup <- function(lines) {
+  tmp <- grep("^Newsgroups[ \t]*:", lines);
+  start <- tmp[1];
+  
+  stop  <- NA;
+  for(i in (start+1):length(lines)) {
+    if(length(grep(":", lines[i])) > 0) {
+      stop <- i - 1;
+      break;
+    }
+  }
+  
+  return( lines[start:stop] );
 }
 
 # FUNC extract.field.of.application
@@ -80,21 +123,20 @@ extract.field.of.application.lines <- function(lines) {
 # streszczenie jest dostarczane funkcji w postaci
 # wektora liniji
 #
-extract.field.of.application <- function(lines) {
-	lines <- extract.field.of.application.lines(lines);
+extract.field.of.application <- function(lines,id) {
 	
-	lines <- gsub("^Fld Applictn[ \t]*:[ \t]*", "", lines);
-	lines <- gsub("^[ \t]*[0-9]+[ \t]*", "", lines);
-	lines <- gsub("[^-A-Za-z0-9& \t\n\r]+", ".", lines);
-
-	# Usuwamy spacje
-	lines <- gsub("[ \t\n\r]+", "", lines);
-	
-	tmp   <- '';
-	if(length(lines) > 1)
-		tmp <- cat.lines(lines[2:length(lines)], sep=', ');
-
-	return(paste(lines[1], tmp, sep=''));
+  source <- extract.field.of.application.lines.newsgoup(lines);
+  source <- gsub("^Newsgroups[ \t]*:[ \t]*", "", source);
+  for (k in klasy) {
+    resoult = stri_extract_last(source, regex = k); 
+    if (!is.na(resoult)){
+      #cat("\n");
+      #cat(resoult);
+      #cat("\n");
+      return(resoult);
+    }
+  }
+  return(NA);
 }
 
 # FUNC extract.abstract(lines)
@@ -105,10 +147,16 @@ extract.field.of.application <- function(lines) {
 # wektora liniji
 #
 extract.abstract <- function(lines) {
-	results <- grep("^Abstract[ \t]*:[ \t]*$", lines);
+  for(i in 1:length(lines)) {
+    if(nchar(lines[i]) == 0) {
+      start <- i;
+      break;
+    }
+  }
+  stop  <- length(lines);
+  lines <- lines[start:stop];
 	
-	abstract.header.line <- results[1];
-	abstract.lines 	  <- lines[(abstract.header.line+1):length(lines)];
+	abstract.lines 	  <- lines[2:length(lines)];
 	
 
 	abstract.lines <- cat.lines(abstract.lines);
@@ -123,11 +171,11 @@ extract.abstract <- function(lines) {
 # lines - to wektor napisow reprezentujacych
 # plik ze streszczeniem
 #
-extract.information <- function(lines) {
-	field.of.app <- extract.field.of.application(lines);
+extract.information <- function(lines,id) {
+	field.of.app <- extract.field.of.application(lines,id);
 	abstract <- extract.abstract(lines);
 
-	# cat(field.of.app);
+	cat(field.of.app);
 	return(c(field.of.app, "", abstract));
 }
 
@@ -141,7 +189,7 @@ extract.information <- function(lines) {
 # artykuly nie mialy przypisanych kategorii, inne
 # z koleji w polu abstract posiadaly wpis "Not Available"
 #
-is.valid.article.description <- function(lines, N=30) {	
+is.valid.article.description <- function(lines, N=10) {	
 	is.valid <- ( length(lines) == 3 );
 
 	if(is.valid)
@@ -156,14 +204,14 @@ is.valid.article.description <- function(lines, N=30) {
 
 # FUNC preprocess.article(full.input.path, full.output.path)
 #
-preprocess.article <- function(full.input.path, full.output.path)  {
+preprocess.article <- function(full.input.path, full.output.path,a)  {
 	cat(sprintf("[%s]", full.input.path));
 	
 	handle <- file(full.input.path, "rt");
 	lines  <- readLines(handle);
 	close(handle);
 
-	lines <- extract.information(lines);
+	lines <- extract.information(lines,a);
 
 	if(is.valid.article.description(lines)) {
 		handle <- file(full.output.path, "wt");
@@ -191,7 +239,7 @@ preprocess <- function(input.path, output.path) {
 
 	articles <- list.files(
 		path=input.path, 
-		pattern="*.txt",
+		pattern="*",
 		full.names=FALSE,
 		ignore.case=TRUE
 		);
@@ -199,7 +247,7 @@ preprocess <- function(input.path, output.path) {
 	for(a in articles) {
 		full.input.path  <- paste(input.path, a, sep='');
 		full.output.path <- paste(output.path, a, sep='');
-		try(preprocess.article(full.input.path, full.output.path));
+		try(preprocess.article(full.input.path, full.output.path,a));
 	}
 
 }

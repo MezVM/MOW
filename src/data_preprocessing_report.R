@@ -8,13 +8,13 @@
 
 # Sciezka do katalogu ktory zawiera rozpakowane
 # archiwum Part1.zip
-org.data.directory <- 'D:/tmp/words/Part1/'
+org.data.directory <- 'D:/MOW/20_newsgroups/'
 
 
 # Sciezka do katalogu ktory bedzie zawieral
 # przetworzone dane oraz dane tymczsowe
 #
-data.directory <- 'd:/mtmp/';
+data.directory <- 'D:/MOW/tmp/';
 
 # -----------------------------------------------
 
@@ -38,7 +38,7 @@ dir.create(data.out, recursive=TRUE);
 # Kopiowanie plikow txt do katalogu data.in
 cat('Kopiowanie plikow...\n');
 
-flist  <- list.files(org.data.directory, recursive=TRUE, pattern='*.txt', full.names=TRUE);
+flist  <- list.files(org.data.directory, recursive=TRUE, pattern='*', full.names=TRUE);
 for(f in flist) {
 	cat(sprintf("Copy file %s\n", f));
 

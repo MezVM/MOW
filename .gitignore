@@ -1,0 +1,12 @@
+!*.tex
+!*.r
+!.gitignore
+!Makefile
+*.aux
+*.out
+*.log
+*.pdf
+
+.Rproj.user
+20_newsgroups
+tmp
