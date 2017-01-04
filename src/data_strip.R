@@ -136,7 +136,8 @@ vectorize.data <- function(df, min.n=500, invalid.cats.hash=emptyenv(), min.w=2)
 	return(list(data=df[rows.vector, words], 
 			  fact=factor(cats.vector),
 			  rows.indexes=rows.vector,
-			  org.classes=df[rows.vector,used.columns]));
+			  org.classes=df[rows.vector,used.columns],
+			  optimalized.df=df[rows.vector,c(words,used.columns)]));
 }
 
 # FUNC make.df.binary(df)

@@ -244,10 +244,15 @@ preprocess <- function(input.path, output.path) {
 		ignore.case=TRUE
 		);
 
+	counter = 0;
 	for(a in articles) {
-		full.input.path  <- paste(input.path, a, sep='');
-		full.output.path <- paste(output.path, a, sep='');
-		try(preprocess.article(full.input.path, full.output.path,a));
+	  if (counter == 3){ 
+  		full.input.path  <- paste(input.path, a, sep='');
+  		full.output.path <- paste(output.path, a, sep='');
+  		try(preprocess.article(full.input.path, full.output.path,a));
+  		counter = 0;
+	  }
+	  counter = counter + 1;
 	}
 
 }
