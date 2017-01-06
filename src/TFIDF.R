@@ -1,16 +1,5 @@
 
 
-
-
-
-
-
-
-
-
-
-
-
 getClasses <- function(train_classes) {
   NR <- nrow(train_classes);
   classes <- colnames(train_classes)
@@ -49,9 +38,36 @@ tfIDF <- function(train_data,train_classes,test_data) {
       IDF <- log10(D/DF);
       TF_class = sum(train_data[classes_list$positions[[cl]],c]);
       TFIDF <- TF_class*IDF;
-      wektor_klasy <- c(wektor_klasy,TFIDF)
+      if(is.na(TFIDF)){
+        wektor_klasy <- c(wektor_klasy,0);
+      }
+      else{
+        wektor_klasy <- c(wektor_klasy,TFIDF);
+      }
     } # wszystkkie slowa w klasie
     all_vectors <- append(all_vectors,list(wektor_klasy));
   }
   
+  # faza Klasyfikacji danych testowych:
+  
+  clasification_list = c();
+  cat(sprintf('\n\n'));
+  flush(stdout());
+  for(row_index in 1:nrow(test_data)) {
+    cat(sprintf('\tKlasyfikacja: %d / %d\r', row_index, nrow(test_data)));
+    flush(stdout());
+    max_class_index = 0;
+    max_class_similarity = 0;
+    for(class_vector_index in 1:length(all_vectors)){
+      v1 <- all_vectors[[class_vector_index]];
+      v2 <- as.numeric(test_data[row_index,]);
+      cosine.similarity <- (sum(v1 * v2)) / (norm(v1, type="2") * norm(v2, type="2"));
+      if(cosine.similarity > max_class_similarity){
+        max_class_similarity = cosine.similarity;
+        max_class_index = class_vector_index;
+      }
+    }
+    clasification_list <- c(clasification_list,max_class_index);
+  }
+  return(clasification_list)
 }
