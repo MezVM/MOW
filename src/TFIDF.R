@@ -67,7 +67,7 @@ tfIDF <- function(train_data,train_classes,test_data) {
         max_class_index = class_vector_index;
       }
     }
-    clasification_list <- c(clasification_list,max_class_index);
+    clasification_list <- c(clasification_list,classes_list$classes[max_class_index]);
   }
   return(clasification_list)
 }
