@@ -35,10 +35,8 @@ train.naive.bayes <- function(data, fact, p=-1) {
 
 		class.rows <- which(fact == lvl[c]);
 		for(a in 1:A) {
-			condprob[2*c-1, a] = 
-				(sum(data[class.rows, a] == 0) + pc*Nc) / (2*Nc);
-			condprob[2*c, a] = 
-				(sum(data[class.rows, a] == 1) + pc*Nc) / (2*Nc);
+			condprob[2*c-1, a] = (sum(data[class.rows, a] == 0) + pc*Nc) / (2*Nc);
+			condprob[2*c, a] = (sum(data[class.rows, a] == 1) + pc*Nc) / (2*Nc);
 		}	
 	}
 
@@ -62,30 +60,41 @@ train.naive.bayes <- function(data, fact, p=-1) {
 # Kolumny sa uporzadkowoane zgodnie z porzadkiem leveli  faktora
 # zwracanym przez levels
 #
-predict.mcNb <- function(model, data) {
+predict.mcNb <- function(model, data, classes) {
 	data <- sign(as.matrix(data));
-
+	lvl <- levels(classes);
 	CN <- length(model$prior);
 	A  <- ncol(data);
 	result <- matrix(nrow=nrow(data), ncol=CN);
-
+  colnames(result) <- lvl;
+	
 	N <- nrow(data);
-	log.cp <- log(model$condprob);
-	log.prior <- log(model$prior);
-
+	log.cp <- log10(model$condprob);
+	log.prior <- log10(model$prior);
+  
 	for(r in 1:N) {
 		cat(sprintf("Wiersz %d/%d\t\t\r", r, N));
 	
 		for(c in 1:CN) {
-			tmp <- log.cp[c];
-			tmp <- tmp + 
-				sum( ifelse(data[r,] == 0, log.cp[2*c-1,], log.cp[2*c,]) );
+			tmp <- log.prior[c] + sum( ifelse(data[r,] == 0, log.cp[2*c-1,], log.cp[2*c,]) );
 			result[r, c] <- tmp;
 		}
 	}
 
 	cat('\n');
-	return(result);
+	solution = c();
+	for(r in 1:nrow(result)) {
+	  max_hx = 0;
+	  index = 0;
+	  for (c in 1:ncol(result)) {
+	    if (result[r,c] < max_hx) {
+	      max_hx = result[r,c];
+	      index = c;
+	    }
+	  }
+	  solution = c(solution,lvl[index]);
+	}
+	return(solution);
 }
 
 
