@@ -37,7 +37,7 @@ create.articles.data.frame(data.in,str.join(data.out,data.df.name))
 myTable <- read.table(str.join(data.out,data.df.name),header = TRUE)
 min.n=20;
 min.w=nrow(myTable)*0.02;
-source("data_strip.R")
+source("data_optimaliser.R")
 optimalised.df <- vectorize.data(df = myTable, min.n = min.n, min.w = min.w);
 
 # określa podział zbirów testujacych i trenujących. Z lewej procentowy rozmiar zbioru treujacego

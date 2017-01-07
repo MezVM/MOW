@@ -1,18 +1,14 @@
 library(stringi)
 
-# preproces.r
-#
-# Plik odpowiada za wstepne przetworzenie artykulow 
-# naukowych do postaci:
-#
-# Pierwsza linijka zawiera kategorie artykulu naukowego
-# Pusta linia
-# Trzecia linijka zawiera tekst strzeszczeni bez znakow przestankowych
-# i liczb
-#
-# !mc
-#
 
+# Plik odpowiada za wstepne przetworzenie newsow
+# postac:
+#
+#   1. Kategoria
+#   2.
+#   3. Tekst newsa
+
+# lista rozpoznawanych klas
 klasy = c("alt.atheism",
           "comp.graphics",
           "comp.os.ms-windows.misc",
@@ -36,37 +32,32 @@ klasy = c("alt.atheism",
 
 
 
-# FUNC append.slash(dir.path)
-#
+
 # funkcja dodaje na koncu sciezki dir.path
 # \ jezeli nie zostal juz dodany
 #
-append.slash <- function(dir.path) {
+appendSlash <- function(dir.path) {
 	if(length(grep("[\\/]$", dir.path)) > 0)
 		return(dir.path);
 	return(paste(dir.path, '/', sep=''));
 }
 
 
-# FUNC trim.lines
-#
+
 # funkcja usuwa biale znaki z poczatku i konca
-# oraz ze srodka linii. usuwane znaki ze
-# srodka sa zastepowane pojedyncza spacja
-# funkca operuje na zbiorze linii
+# oraz ze srodka linii.
 #
-trim.lines <- function(lines) {
+trimLines <- function(lines) {
 	lines <- gsub("[ \t\n\r]+", " ", lines);
 	lines <- gsub("(^[ ]+)|([ ]+$)", "", lines);
 	return(lines);
 }
 
-# FUNC cat.lines
-#
+
 # funkcja laczy stringi w wektorze
 # lines w jedna dluga linje
 #
-cat.lines <- function(lines, sep=' ') {
+catLines <- function(lines, sep=' ') {
 	result <- '';
 
 	for(line in lines) {
@@ -75,30 +66,12 @@ cat.lines <- function(lines, sep=' ') {
 	return(result);
 }
 
-# FUNC extract.field.of.application.lines
-# 
-# wyodrebnia z pliku linie zwiazane z wlasciwoscia
-# Fld Applictn
-#
-extract.field.of.application.lines.xref <- function(lines) {
-  tmp <- grep("^Xref[ \t]*:", lines);
-  if (is.na(tmp[1])){
-    return( "" );
-  }
-  start <- tmp[1];
-  
-  stop  <- NA;
-  for(i in (start+1):length(lines)) {
-    if(length(grep(":", lines[i])) > 0) {
-      stop <- i - 1;
-      break;
-    }
-  }
-  
-  return( lines[start:stop] );
-}
 
-extract.field.of.application.lines.newsgoup <- function(lines) {
+
+# wyodrebnia z pliku linie zwiazana z wlasciwa kategoria w ramach
+# lini Newsgroups. Jezeli w lini Xref nic nie bylo, to bedzie tutaj
+#
+extractCategoryNewsgroup <- function(lines) {
   tmp <- grep("^Newsgroups[ \t]*:", lines);
   start <- tmp[1];
   
@@ -113,40 +86,28 @@ extract.field.of.application.lines.newsgoup <- function(lines) {
   return( lines[start:stop] );
 }
 
-# FUNC extract.field.of.application
+
+# funkcja wydobywa pole zastosowan z newsie
 #
-# funkcja wydobywa pole zastosowan ze streszczenia.
-# przykladowa postac pola:
-# |Fld Applictn: 0302000   Biological Pest Control                 
-# |              45        Ecology 
-#
-# streszczenie jest dostarczane funkcji w postaci
-# wektora liniji
-#
-extract.field.of.application <- function(lines,id) {
+extractCategory <- function(lines,id) {
 	
-  source <- extract.field.of.application.lines.newsgoup(lines);
+  source <- extractCategoryNewsgroup(lines);
   source <- gsub("^Newsgroups[ \t]*:[ \t]*", "", source);
   for (k in klasy) {
     resoult = stri_extract_last(source, regex = k); 
     if (!is.na(resoult)){
-      #cat("\n");
-      #cat(resoult);
-      #cat("\n");
       return(resoult);
     }
   }
   return(NA);
 }
 
-# FUNC extract.abstract(lines)
-#
-# funkcja wydobywa abstract z pliku streszczenia
-#
-# streszczenie jest dostarczane funkcji w postaci
+
+# funkcja wydobywacialo z pliku newsa
+# news jest dostarczane funkcji w postaci
 # wektora liniji
 #
-extract.abstract <- function(lines) {
+extractAbstract <- function(lines) {
   for(i in 1:length(lines)) {
     if(nchar(lines[i]) == 0) {
       start <- i;
@@ -159,37 +120,34 @@ extract.abstract <- function(lines) {
 	abstract.lines 	  <- lines[2:length(lines)];
 	
 
-	abstract.lines <- cat.lines(abstract.lines);
-	return(trim.lines(abstract.lines));
+	abstract.lines <- catLines(abstract.lines);
+	return(trimLines(abstract.lines));
 }
 
-# FUNC extract.information(lines)
-# 
+
 # funkcja dokonuje opisanego w naglowku pliku
 # przeksztalcenia streszczenia artykulu nukowego 
 #
 # lines - to wektor napisow reprezentujacych
 # plik ze streszczeniem
 #
-extract.information <- function(lines,id) {
-	field.of.app <- extract.field.of.application(lines,id);
-	abstract <- extract.abstract(lines);
+extractInformation <- function(lines,id) {
+	field.of.app <- extractCategory(lines,id);
+	abstract <- extractAbstract(lines);
 
 	cat(field.of.app);
 	return(c(field.of.app, "", abstract));
 }
 
-# FUNC is.valid.article.description(lines)
-#
+
 # funkcja sprawdza czy podany artykul zawiera wymagane
 # dane (tj. co najmniej jedna kategorie oraz tekst
-# streszczenia dluzszy niz co najmniej N znakow)
+# newsa dluzszy niz co najmniej N znakow)
 #
 # funkcja zostala wprowadzona poniewaz niektore
-# artykuly nie mialy przypisanych kategorii, inne
-# z koleji w polu abstract posiadaly wpis "Not Available"
+# artykuly byly zbyt krutkie i trudne do klasyfikacji
 #
-is.valid.article.description <- function(lines, N=10) {	
+newsValidation <- function(lines, N=10) {
 	is.valid <- ( length(lines) == 3 );
 
 	if(is.valid)
@@ -202,18 +160,18 @@ is.valid.article.description <- function(lines, N=10) {
 }
 
 
-# FUNC preprocess.article(full.input.path, full.output.path)
+# FUNC preprocessNews(full.input.path, full.output.path)
 #
-preprocess.article <- function(full.input.path, full.output.path,a)  {
+preprocessNews <- function(full.input.path, full.output.path,a)  {
 	cat(sprintf("[%s]", full.input.path));
 	
 	handle <- file(full.input.path, "rt");
 	lines  <- readLines(handle);
 	close(handle);
 
-	lines <- extract.information(lines,a);
+	lines <- extractInformation(lines,a);
 
-	if(is.valid.article.description(lines)) {
+	if(newsValidation(lines)) {
 		handle <- file(full.output.path, "wt");
 		writeLines(lines, handle);
 		close(handle);
@@ -224,8 +182,6 @@ preprocess.article <- function(full.input.path, full.output.path,a)  {
 	cat('\n');
 }
 
-# FUNC preprocess(input.path, output.path)
-#
 # input.path - Sciezka do katalogu zawierajacego
 # pliki txt z surowymi tekstami artkulow
 #
@@ -234,8 +190,8 @@ preprocess.article <- function(full.input.path, full.output.path,a)  {
 #
 preprocess <- function(input.path, output.path) {
 
-	input.path  <- append.slash(input.path);
-	output.path <- append.slash(output.path);
+	input.path  <- appendSlash(input.path);
+	output.path <- appendSlash(output.path);
 
 	articles <- list.files(
 		path=input.path, 
@@ -249,7 +205,7 @@ preprocess <- function(input.path, output.path) {
 	  if (counter == 3){ 
   		full.input.path  <- paste(input.path, a, sep='');
   		full.output.path <- paste(output.path, a, sep='');
-  		try(preprocess.article(full.input.path, full.output.path,a));
+  		try(preprocessNews(full.input.path, full.output.path,a));
   		counter = 0;
 	  }
 	  counter = counter + 1;

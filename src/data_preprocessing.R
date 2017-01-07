@@ -1,22 +1,16 @@
-# 
-# Przetwarzanie danych Etap I
-#
-# !mc: 16.05.2012
-#
+
+# Uzywac tego skryptu jako pierwszego.
 
 # NAZWY KATALOGOW POWINNY KONCZYC SIE /
-
-# Sciezka do katalogu ktory zawiera rozpakowane
-# archiwum Part1.zip
+# Sciezka do katalogu ktory zawiera rozpakowane archiwum
 org.data.directory <- 'D:/MOW/20_newsgroups/'
 
 
 # Sciezka do katalogu ktory bedzie zawieral
 # przetworzone dane oraz dane tymczsowe
-#
 data.directory <- 'D:/MOW/tmp/';
 
-# -----------------------------------------------
+
 
 # FUNC str.join
 #
@@ -30,23 +24,16 @@ str.join <- function(a, b) {
 
 data.in  <- str.join(data.directory, 'data_original/');
 data.out <- str.join(data.directory, 'data_preprocessed/');
-
-# Tworzenie katalogow
 dir.create(data.in, recursive=TRUE);
 dir.create(data.out, recursive=TRUE);
-
-# Kopiowanie plikow txt do katalogu data.in
 cat('Kopiowanie plikow...\n');
-
 flist  <- list.files(org.data.directory, recursive=TRUE, pattern='*', full.names=TRUE);
 for(f in flist) {
-	cat(sprintf("Copy file %s\n", f));
+	cat(sprintf("Plik: %s\n", f));
 
 	new.name <- str.join(data.in, basename(f));
 	file.copy(f, new.name, overwrite=TRUE);
 }
-
-
 source('preprocess.R');
 preprocess(data.in, data.out);
 

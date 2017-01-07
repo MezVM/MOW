@@ -2,33 +2,20 @@
 # Plik zawiera funkcje odpowiedzialne za 
 # odrzucenie czesci kategorii, oraz wektoryzacje
 # kategorii. 
-# Przyklad wektoryzacji, zalozmy ze mamy wiersz danych
-# a1, a2, a3, ..., an, c1, c2, ..., ck
-# a wiec nalezacy do k klas. Wiersz ten zostanie
-# zamieniony na k wierszy z ktorych kazdy nalezy
-# tylko i wylacznie do 1 kategorii.
-# Zamiana wymuszona przez postac funkcji naiveBayes
-# Dodatkowo zostana odrzucone kategoria 'OtherApplicationsNEC'
-# oraz kategorie reprezentowane przez dane w niedostateczny sposob.
-# 
-# !mc
-#
 
-# FUNC is.column.name(s)
-#
+
+
 is.column.name <- function(s) {
 	return(length( grep('^c\\.', s) ) > 0);
 }
 
-# FUNC is.invalid(column.name, invalid.cats.hash)
-#
+
 is.invalid <- function(column.name, invalid.categories.hash) {
 	return(exists(column.name, envir=invalid.categories.hash, inherits=FALSE));
 }
 
 
-# FUNC vectorize.categories(text.data.frame, min.n, invalid.cats.hash = emptyenv())
-#
+
 # min.n - minimalna liczba wystapien danej kategorii
 # invalid.cats.hash - nazwy kategori ktore powinny zostac
 #  	odrzucone
@@ -36,7 +23,7 @@ is.invalid <- function(column.name, invalid.categories.hash) {
 # RETURN wektor logiczny l taki ze l[nr.kolumny] == T jezeli
 # dana kategoria powinna wystepowac w ostatecznych danych
 #
-vectorize.categories <- function(text.data.frame, min.n, invalid.cats.hash) {
+vectorizeCategories <- function(text.data.frame, min.n, invalid.cats.hash) {
 	column.names <- colnames(text.data.frame);
 	result       <- logical( ncol(text.data.frame) );
 
@@ -53,8 +40,7 @@ vectorize.categories <- function(text.data.frame, min.n, invalid.cats.hash) {
 	return(result);
 }
 
-# FUNC create.hash(str.vector)
-#
+
 create.hash <- function(str.vector) {
 	e <- new.env(hash=TRUE, parent=emptyenv());
 	
@@ -65,49 +51,43 @@ create.hash <- function(str.vector) {
 	return(e);
 }
 
-# FUNC get.df.column.indexes(df, cs)
-#
+
 # funkcja zwraca wektor indeksow kolumn nalezacych
 # do klasy cs
 # cs = 'c' dla kategori, cs = 'w' dla slow oraz
 # cs = 'meta' dla informacji dodatkowych
 #
-get.df.column.indexes <- function(df, cs) {
+getDfIndexes <- function(df, cs) {
 	column.names  <- colnames(df);
 	class.columns <- grep(paste("^",cs,"\\.",sep=''), column.names);
 
 	return( (1:ncol(df)) [class.columns] );
 }
 
-# FUNC vectorize.data(df, min.n, invalid.cats.hash, min.w)
-#
-# funkcja przeksztalca ramke danych, na postac
-# ktora moze zostac podana dla funkcji naiveBayes
+
+# Funkcja optymalizuje ramke danych
 #
 # min.n - minimalna liczba wystapien danej kategorii
-# invalid.cats.hash - nazwy kategori ktore powinny zostac
-#  	odrzucone
+# invalid.cats.hash - nazwy kategori ktore powinny zostac odrzucone
 # min.w - minimalna liczba wystapien danego slowa
 # 
-# RETURN lista zawierajaca $data - dane oraz $fact - factor
-# bedacy lista kategori odpowiadajaca poszczegolnym wierszom danych
+# RETURN lista zawierajaca
+#   $data - dane
+#   $rows.indexes - indexy poszczegolnych klas
+#   $org.classes - df klas
+#   $optimalized.df  - wspolna zoptymalizowana ramka klas i slow
 #
 # format ramki danych (nazwy kolumn)
 # w. w. w. ... w. c. ... c. meta. ... meta.
 #
 vectorize.data <- function(df, min.n=500, invalid.cats.hash=emptyenv(), min.w=2) {
 	cats.names    <- colnames(df);
-	cats.indexes  <- get.df.column.indexes(df, 'c');
-	allow.in.data <- vectorize.categories(df, min.n, invalid.cats.hash);
-
+	cats.indexes  <- getDfIndexes(df, 'c');
+	allow.in.data <- vectorizeCategories(df, min.n, invalid.cats.hash);
 	max.words.index <- min(cats.indexes) - 1;
-	
 	rows.vector <- integer(0);
 	cats.vector <- character(0);
-
-	# Pierszy wiersz ma specjalne znaczenie
 	N = nrow(df);
-
 	for(i in 2:N){
 		cat(sprintf('I Faza: Wiersz %d / %d\r', i, N));
 		flush(stdout());
@@ -133,15 +113,13 @@ vectorize.data <- function(df, min.n=500, invalid.cats.hash=emptyenv(), min.w=2)
 
 	used.columns <- which(allow.in.data == TRUE);
 
-	return(list(data=df[rows.vector, words], 
-			  fact=factor(cats.vector),
+	return(list(data=df[rows.vector, words],
 			  rows.indexes=rows.vector,
 			  org.classes=df[rows.vector,used.columns],
 			  optimalized.df=df[rows.vector,c(words,used.columns)]));
 }
 
-# FUNC make.df.binary(df)
-#
+
 # funkcja zamienia ramke danych zawierajaca liczby
 # na ramke zawierajaco 0 i 1 (dla liczb >= 0)
 #
