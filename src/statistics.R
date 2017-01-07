@@ -4,7 +4,7 @@ correct <- function(test.data, predict.data) {
 }
 
 recall <- function(test.data, predict.data, class_name) {
-  tmp <- mean(solution_list[solution_list == class_name] == newClasses[solution_list == class_name]);
+  tmp <- mean(test.data[test.data == class_name] == predict.data[test.data == class_name]);
   return(tmp);
 }
 
