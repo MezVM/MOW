@@ -35,7 +35,7 @@ train.naive.bayes <- function(data, fact, p=-1) {
 
 		class.rows <- which(fact == lvl[c]);
 		for(a in 1:A) {
-			condprob[2*c-1, a] = (sum(data[class.rows, a] == 0) + pc*Nc) / (2*Nc);
+			condprob[2*c-1, a] = 1-(sum(data[class.rows, a] == 1) + pc*Nc) / (2*Nc);
 			condprob[2*c, a] = (sum(data[class.rows, a] == 1) + pc*Nc) / (2*Nc);
 		}	
 	}
@@ -69,8 +69,8 @@ predict.mcNb <- function(model, data, classes) {
   colnames(result) <- lvl;
 	
 	N <- nrow(data);
-	log.cp <- log10(model$condprob);
-	log.prior <- log10(model$prior);
+	log.cp <- log(model$condprob);
+	log.prior <- log(model$prior);
   
 	for(r in 1:N) {
 		cat(sprintf("Wiersz %d/%d\t\t\r", r, N));
@@ -84,10 +84,10 @@ predict.mcNb <- function(model, data, classes) {
 	cat('\n');
 	solution = c();
 	for(r in 1:nrow(result)) {
-	  max_hx = 0;
+	  max_hx = -999999;
 	  index = 0;
 	  for (c in 1:ncol(result)) {
-	    if (result[r,c] < max_hx) {
+	    if (result[r,c] > max_hx) {
 	      max_hx = result[r,c];
 	      index = c;
 	    }

@@ -92,7 +92,9 @@ table(p, solution_list)
 
 
 
+
 source("statistics.R")
+correct(solution_list,p);
 correct(solution_list,newClasses);
 stat.df <- getStatisticDF(solution_list,newClasses,colnames(optimalised.df$org.classes))
 stat.df
