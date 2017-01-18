@@ -5,12 +5,7 @@
 #
 # lista slow pochodzi ze strony:
 # http://norm.al/2009/04/14/list-of-english-stop-words/
-#
-# !mc
 
-# TODO: moze warto przezucic to do osobnego pliku
-# i wczytywac przy initialize...
-#
 STOP.WORDS.VECTOR <- c(
 	"a", "about", "above", "above", "across", "after", 
 	"afterwards", "again", "against", "all", "almost", 
@@ -57,9 +52,6 @@ STOP.WORDS.VECTOR <- c(
 STOP.WORDS.ENV <- NA;
 
 
-
-# FUNC init.stop.words.dictionary()
-#
 # funkcja inicjalizuje tablice haszujaca za pomoca wektora
 # STOP.WORDS.VECTOR
 # uzycie tablicy haszujacej pozwoli pszyspieszyc proces
@@ -73,8 +65,6 @@ init.stop.words.dictionary <- function() {
 	}
 }
 
-# FUNC is.stop.word(word)
-#
 # funkcja sprawdza czy podane slowo znajduje
 # sie na liscie stop words
 # fix: z powodu uzycia funkcji przy operajach indeksowania

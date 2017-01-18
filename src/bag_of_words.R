@@ -1,8 +1,5 @@
-# Funkcje tu zawarte odpowiadaja za utworzenie tabeli, wktora
-# nastepnie jest zapisywana do wskazanego pliku
-# tabela moze byc duza wiec prosi sie o cierpliwosc (~500mb)
+# Funkcje tu zawarte odpowiadaja za utworzenie tabeli
 # kolumny tabeli to slowa z newsow, kategorie i metadane statystyczne
-# w.*   c.*   m.*
 
 
 # zeby uchronic sie od wplywu jezyka na sposob sortowania napisow

@@ -1,4 +1,8 @@
 
+# przeksztalca ramke klas na postac przystepna do
+# iteracji
+#
+# train_classes - ramka przynależności do klas.
 
 getClasses <- function(train_classes) {
   NR <- nrow(train_classes);
@@ -19,6 +23,14 @@ getClasses <- function(train_classes) {
 }
 
 
+
+# train_data - ramka zawierająca dane do nauki
+# train_classes - ramka zwierająca informacje o
+# przynależnościach danych do nauki
+# test_data - dane testowe, na ktorych odbywa si eklasyfikacja
+#
+# RETURN - vektor klasyfikacji wierszy z test_data
+#
 
 tfIDF <- function(train_data,train_classes,test_data) {
   NC <- ncol(train_data);

@@ -3,8 +3,7 @@
 #
 #
 
-# FUNC metric.euclid(v1,v2) 
-# 
+
 # Funkcja liczy odleglosc pomiedzy wektorami zgodnie z metryka euklidesowa
 #
 # v1 - pierwszy wektor
@@ -16,8 +15,6 @@ metric.euclid <- function(v1,v2) {
   return (sqrt (sum ((v2 - v1)^2)))
 }
 
-# FUNC metric.cos(v1,v2) 
-# 
 # Funkcja liczy odleglosc pomiedzy wektorami zgodnie z metryka kosinusowa
 #
 # v1 - pierwszy wektor
@@ -35,8 +32,6 @@ vec.norm <- function(v) {
 	return( v / sqrt(sum(v*v)) );
 }
 
-# FUNC knn2(data, fact, test.data, k)
-#
 # data - ramka danych 
 # fact - klasyfikacja wierszy z data
 # test.data - dane ktore nalezy zaklasyfikowac

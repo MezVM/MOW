@@ -1,13 +1,10 @@
-#
+
 # Plik zawiera implementacje algorytmu
 # Naiwnego Klasyfikatora Bayesowskiego
-#
-# !mc
-#
 
 
-# FUNC train.naive.bayes(data, fact)
-#
+
+
 # data - ramka danych zawierajaca liczby
 # fact - faktor zawierajacy poprawna klasyfikacje
 # tekstow nalezacych do data
@@ -45,8 +42,7 @@ train.naive.bayes <- function(data, fact, p=-1) {
 	return(model);
 }
 
-# FUNC predict.mcNb(model, data)
-#
+
 # Rozszerzenie funkcji generycznej predict.
 # Obiekt model musi byc lista zawierajaca
 # dwa pola $prior $condprob bedace odpowiednio
@@ -55,7 +51,7 @@ train.naive.bayes <- function(data, fact, p=-1) {
 # (data MUSI zawierac miec IDENTYCZNA strukture co
 # dane uzyte przy nauce klasyfikatora)
 #
-# RETURN macierz ktora dla kazdego wiersza danych zwraca 
+# RETURN macierz ktora dla kazdego wiersza danych zwraca
 # wiersz okreslajacy p-stwo przynaleznosci do danej ktegorii
 # Kolumny sa uporzadkowoane zgodnie z porzadkiem leveli  faktora
 # zwracanym przez levels
@@ -67,14 +63,14 @@ predict.mcNb <- function(model, data, classes) {
 	A  <- ncol(data);
 	result <- matrix(nrow=nrow(data), ncol=CN);
   colnames(result) <- lvl;
-	
+
 	N <- nrow(data);
 	log.cp <- log(model$condprob);
 	log.prior <- log(model$prior);
-  
+
 	for(r in 1:N) {
 		cat(sprintf("Wiersz %d/%d\t\t\r", r, N));
-	
+
 		for(c in 1:CN) {
 			tmp <- log.prior[c] + sum( ifelse(data[r,] == 0, log.cp[2*c-1,], log.cp[2*c,]) );
 			result[r, c] <- tmp;
